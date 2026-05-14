@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "inventorywatcher",
+  "version": "${version}",
+  "name": "InventoryWatcher",
+  "description": "Client-side scaffold mod for inventory state observation.",
+  "authors": [
+    "InventoryWatcher"
+  ],
+  "contact": {},
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "main": [
+      "com.inventorywatcher.InventoryWatcherMod"
+    ],
+    "client": [
+      "com.inventorywatcher.InventoryWatcherClient"
+    ]
+  },
+  "mixins": [
+    "mixins.inventorywatcher.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.2",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

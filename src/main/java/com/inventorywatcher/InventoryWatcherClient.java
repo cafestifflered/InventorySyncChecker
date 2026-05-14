@@ -4,10 +4,10 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.text.Text;
-import net.minecraft.client.MinecraftClient;
 
 public class InventoryWatcherClient implements ClientModInitializer {
     private static int tickDelay = 0;
@@ -45,7 +45,7 @@ public class InventoryWatcherClient implements ClientModInitializer {
 
         // Register listener for PLAYER_FULLY_LOADED event
         WatcherEvents.PLAYER_FULLY_LOADED.register(() -> {
-            if (InventoryWatcherMod.CONFIG.isRunning()) {
+            if (ModConfig.running) {
                 InventoryWatcherMod.LOGGER.info("Watcher is running - scheduling server load confirmation");
                 scheduleAfterTicks(3, WatcherStateMachine::onServerLoadConfirmed);
             }
@@ -70,16 +70,17 @@ public class InventoryWatcherClient implements ClientModInitializer {
     }
 
     private int handleStart(CommandContext<FabricClientCommandSource> context) {
-        InventoryWatcherMod.CONFIG.setRunning(true);
+        ModConfig.running = true;
+        WatcherStateMachine.start();
         context.getSource().sendFeedback(Text.literal("Watcher started."));
         InventoryWatcherMod.LOGGER.info("Watcher started");
-        return 1;
+        return Command.SINGLE_SUCCESS;
     }
 
     private int handleStop(CommandContext<FabricClientCommandSource> context) {
-        InventoryWatcherMod.CONFIG.setRunning(false);
+        WatcherStateMachine.stop();
         context.getSource().sendFeedback(Text.literal("Watcher stopped."));
         InventoryWatcherMod.LOGGER.info("Watcher stopped");
-        return 1;
+        return Command.SINGLE_SUCCESS;
     }
 }

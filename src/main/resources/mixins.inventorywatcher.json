@@ -3,7 +3,9 @@
   "package": "com.inventorywatcher.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [],
-  "mixins": [],
+  "mixins": [
+    "ClientPlayNetworkHandlerMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

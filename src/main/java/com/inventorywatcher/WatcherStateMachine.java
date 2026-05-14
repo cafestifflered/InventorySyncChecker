@@ -23,6 +23,7 @@ public class WatcherStateMachine {
     public static void start() {
         ModConfig.running = true;
         currentState = State.CAPTURING_BASELINE;
+        InventoryWatcherMod.LOGGER.info("Watcher state machine started. Capturing baseline inventory...");
         captureBaselineAndSwitch();
     }
 
@@ -55,6 +56,36 @@ public class WatcherStateMachine {
         }
     }
 
+    private static void attemptSwitch(String serverName, State switchingState, int retriesRemaining) {
+        if (!ModConfig.running) {
+            return;
+        }
+
+        awaitingServerLoad = true;
+        currentState = switchingState;
+        ServerSwitchHelper.switchTo(serverName);
+        InventoryWatcherMod.LOGGER.info("Attempting switch to " + serverName + " (retries remaining: " + retriesRemaining + ")");
+
+        // scheduleAfterTicks is single-slot; this assumes attemptSwitch is only called when no other callback is pending.
+        InventoryWatcherClient.scheduleAfterTicks(200, () -> {
+            if (!ModConfig.running) {
+                return;
+            }
+
+            if (awaitingServerLoad) {
+                if (retriesRemaining > 0) {
+                    InventoryWatcherMod.LOGGER.warn("Server switch to " + serverName + " timed out. Retrying...");
+                    attemptSwitch(serverName, switchingState, retriesRemaining - 1);
+                } else {
+                    InventoryWatcherMod.LOGGER.warn("Server switch to " + serverName + " failed after all retries. Halting.");
+                    currentState = State.HALTED;
+                    ModConfig.running = false;
+                    awaitingServerLoad = false;
+                }
+            }
+        });
+    }
+
     private static void captureBaselineAndSwitch() {
         if (!ModConfig.running) {
             return;
@@ -62,9 +93,17 @@ public class WatcherStateMachine {
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null) {
+            InventoryWatcherMod.LOGGER.warn("captureBaselineAndSwitch: player is null, retrying in 10 ticks...");
+            InventoryWatcherClient.scheduleAfterTicks(10, () -> {
+                if (!ModConfig.running) {
+                    return;
+                }
+                captureBaselineAndSwitch();
+            });
             return;
         }
 
+        InventoryWatcherMod.LOGGER.info("Opening inventory screen to capture baseline snapshot...");
         client.setScreen(new InventoryScreen(client.player));
 
         InventoryWatcherClient.scheduleAfterTicks(2, () -> {
@@ -74,10 +113,19 @@ public class WatcherStateMachine {
 
             MinecraftClient delayedClient = MinecraftClient.getInstance();
             if (delayedClient.player == null) {
+                InventoryWatcherMod.LOGGER.warn("Baseline capture callback: player is null, retrying in 10 ticks...");
+                InventoryWatcherClient.scheduleAfterTicks(10, () -> {
+                    if (!ModConfig.running) {
+                        return;
+                    }
+                    captureBaselineAndSwitch();
+                });
                 return;
             }
 
             baselineSnapshot = InventorySnapshot.capture(delayedClient.player.getInventory());
+            InventoryWatcherMod.LOGGER.info("Baseline snapshot captured:");
+            InventoryWatcherMod.LOGGER.info(baselineSnapshot.toLogString());
             delayedClient.setScreen(null);
 
             InventoryWatcherClient.scheduleAfterTicks(1, () -> {
@@ -90,10 +138,7 @@ public class WatcherStateMachine {
                     return;
                 }
 
-                awaitingServerLoad = true;
-                currentState = State.SWITCHING_TO_ZEKROM;
-                ServerSwitchHelper.switchTo("Zekrom");
-                InventoryWatcherMod.LOGGER.info("Baseline captured. Switching to Zekrom...");
+                attemptSwitch("Zekrom", State.SWITCHING_TO_ZEKROM, 1);
             });
         });
     }
@@ -105,10 +150,18 @@ public class WatcherStateMachine {
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null) {
+            InventoryWatcherMod.LOGGER.warn("verifyInventory(" + serverName + "): player is null, retrying in 10 ticks...");
+            InventoryWatcherClient.scheduleAfterTicks(10, () -> {
+                if (!ModConfig.running) {
+                    return;
+                }
+                verifyInventory(serverName, verifyingState);
+            });
             return;
         }
 
         currentState = verifyingState;
+        InventoryWatcherMod.LOGGER.info("Verifying inventory on " + serverName + "...");
         client.setScreen(new InventoryScreen(client.player));
 
         InventoryWatcherClient.scheduleAfterTicks(2, () -> {
@@ -118,6 +171,13 @@ public class WatcherStateMachine {
 
             MinecraftClient delayedClient = MinecraftClient.getInstance();
             if (delayedClient.player == null) {
+                InventoryWatcherMod.LOGGER.warn("verifyInventory callback (" + serverName + "): player is null, retrying in 10 ticks...");
+                InventoryWatcherClient.scheduleAfterTicks(10, () -> {
+                    if (!ModConfig.running) {
+                        return;
+                    }
+                    verifyInventory(serverName, verifyingState);
+                });
                 return;
             }
 
@@ -128,21 +188,29 @@ public class WatcherStateMachine {
 
     private static void checkAndProceed(String serverName, InventorySnapshot current, State verifyingState) {
         if (baselineSnapshot != null && baselineSnapshot.isIdenticalTo(current)) {
+            InventoryWatcherMod.LOGGER.info("Inventory check PASSED on " + serverName + " - inventories are identical.");
+
             MinecraftClient client = MinecraftClient.getInstance();
             client.setScreen(null);
 
             InventoryWatcherMod.LOGGER.info("Inventory verified on " + serverName + " - identical to baseline");
 
             if (verifyingState == State.VERIFYING_ZEKROM) {
-                awaitingServerLoad = true;
-                currentState = State.SWITCHING_TO_CHARIZARDSPAWN;
-                ServerSwitchHelper.switchTo("CharizardSpawn");
-                InventoryWatcherMod.LOGGER.info("Switching to CharizardSpawn...");
+                InventoryWatcherClient.scheduleAfterTicks(200, () -> {
+                    if (!ModConfig.running) {
+                        return;
+                    }
+
+                    attemptSwitch("CharizardSpawn", State.SWITCHING_TO_CHARIZARDSPAWN, 1);
+                });
             } else if (verifyingState == State.VERIFYING_CHARIZARDSPAWN) {
-                awaitingServerLoad = true;
-                currentState = State.SWITCHING_TO_ZEKROM;
-                ServerSwitchHelper.switchTo("Zekrom");
-                InventoryWatcherMod.LOGGER.info("Loop complete. Switching back to Zekrom...");
+                InventoryWatcherClient.scheduleAfterTicks(200, () -> {
+                    if (!ModConfig.running) {
+                        return;
+                    }
+
+                    attemptSwitch("Zekrom", State.SWITCHING_TO_ZEKROM, 1);
+                });
             }
             return;
         }

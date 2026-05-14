@@ -2,10 +2,10 @@
   "required": true,
   "package": "com.inventorywatcher.mixin",
   "compatibilityLevel": "JAVA_21",
-  "client": [],
-  "mixins": [
+  "client": [
     "ClientPlayNetworkHandlerMixin"
   ],
+  "mixins": [],
   "injectors": {
     "defaultRequire": 1
   }

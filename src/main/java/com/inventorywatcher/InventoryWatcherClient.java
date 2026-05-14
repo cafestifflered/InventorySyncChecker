@@ -29,8 +29,9 @@ public class InventoryWatcherClient implements ClientModInitializer {
                 tickDelay--;
             }
             if (tickDelay == 0 && pendingCallback != null) {
-                pendingCallback.run();
-                pendingCallback = null;
+                Runnable callback = pendingCallback;
+                pendingCallback = null; // Clear before run so nested scheduleAfterTicks calls are preserved.
+                callback.run();
             }
 
             // Detect when player loads into a world

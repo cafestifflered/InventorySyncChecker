@@ -93,17 +93,26 @@ public class InventorySnapshot {
      */
     public String toLogString() {
         StringBuilder sb = new StringBuilder("Inventory Snapshot:\n");
-        if (slots.isEmpty()) {
-            sb.append("  (empty)");
-        } else {
-            for (SnapshotSlot slot : slots) {
-                sb.append("  Slot ").append(slot.slotIndex).append(": ")
-                  .append(slot.itemId).append(" x").append(slot.count);
-                if (slot.nbt != null && !slot.nbt.isEmpty()) {
-                    sb.append(" [nbt: ").append(slot.nbt).append("]");
+        for (int i = 0; i <= 40; i++) {
+            SnapshotSlot slot = null;
+            for (SnapshotSlot candidate : slots) {
+                if (candidate.slotIndex == i) {
+                    slot = candidate;
+                    break;
                 }
-                sb.append("\n");
             }
+
+            if (slot == null) {
+                sb.append("  Slot ").append(i).append(": (empty)").append("\n");
+                continue;
+            }
+
+            sb.append("  Slot ").append(slot.slotIndex).append(": ")
+              .append(slot.itemId).append(" x").append(slot.count);
+            if (slot.nbt != null && !slot.nbt.isEmpty()) {
+                sb.append(" [nbt: ").append(slot.nbt).append("]");
+            }
+            sb.append("\n");
         }
         return sb.toString();
     }
